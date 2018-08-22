@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+    <script type="text/javascript" src="jquery-3.2.1.js"></script>
+    <script type="text/javascript" src="jsencrypt.min.js"></script>
+    <script type="text/javascript" src="aes.js"></script>
+    <script type="text/javascript" src="jsrsasign-all-min.js"></script>
+    <!-- <script type="text/javascript">
+    function RSASign(text, digestMethod) {
+        var digest = digestMethod(text);
+        var m = pkcs1pad2(digest, (this.n.bitLength() + 7) >> 3);
+        if (m == null) return null;
+        var c = m.modPow(this.d, this.n);
+        if (c == null) return null;
+        var h = c.toString(16);
+        if ((h.length & 1) == 0) return h;
+        else return "0" + h;
+    }
+
+    function RSAVerify(text, signature, digestMethod) {
+        var c = parseBigInt(signature, 16);
+        var m = c.modPowInt(this.e, this.n);
+        if (m == null) return null;
+        var digest = pkcs1unpad2(m, (this.n.bitLength() + 7) >> 3);
+        return digest == digestMethod(text);
+    }
+
+    RSAKey.prototype.sign = RSASign;
+    RSAKey.prototype.verify = RSAVerify;
+
+    JSEncrypt.prototype.sign = function(text, digestMethod) {
+        try {
+            return this.getKey().sign(text, digestMethod);
+        } catch (ex) {
+            return false;
+        }
+    }
+
+    JSEncrypt.prototype.verify = function(text, signature, digestMethod) {
+        try {
+            return this.getKey().verify(text, signature, digestMethod);
+        } catch (ex) {
+            return false;
+        }
+    }
+
+    function rsaSign() {
+        // var rsa = new JSEncrypt();
+         var pubKey = document.getElementById('publicKey').value;
+         var priKey = document.getElementById('privateKey').value;
+        // rsa.setPrivateKey(priKey);
+        // var smg = rsa.sign('wind', CryptoJS.SHA256);
+        // alert(smg);
+        // rsa.setPublicKey(pubKey);
+        // if (rsa.verify('wind', smg, CryptoJS.SHA256)) {
+        //     alert('成功验签');
+        //     console.log("valid signature !");
+        // } else {
+        //     alert(false);
+        // }
+        // RSA signature generation
+		var sig = new KJUR.crypto.Signature({"alg": "MD5withRSA"});
+		sig.init('-----BEGIN PRIVATE KEY-----\n'+priKey+'\n-----END PRIVATE KEY-----');
+		sig.updateString('aaa');
+		var hSigVal = sig.sign();
+		alert(hSigVal);
+
+		var sig2 = new KJUR.crypto.Signature({"alg": "MD5withRSA"});
+		sig2.init('-----BEGIN PUBLIC KEY-----\n'+pubKey+'\n-----END PUBLIC KEY-----');
+		sig2.updateString('aaa');
+		var isValid = sig2.verify(hSigVal);
+        alert(isValid);
+    }
+    </script> -->
+    <script type="text/javascript">
+    //rsa加密AES的key
+    function rsaCrypt(data) {
+        var rsa = new JSEncrypt();
+        var pubKey = document.getElementById('publicKey').value;
+        if (pubKey) {
+            rsa.setPublicKey(pubKey);
+            return rsa.encrypt(data);
+        }
+
+    }
+
+
+
+    function rsaVerify(source, sign) {
+        // var rsa = new JSEncrypt();
+         var pubKey = document.getElementById('publicKey').value;
+         var priKey = document.getElementById('privateKey').value;
+        // if (pubKey) {
+        //     rsa.setPublicKey(pubKey);
+        //     return rsa.verify(source, sign, CryptoJS.SHA256);
+        // }
+
+        var sig2 = new KJUR.crypto.Signature({"alg": "MD5withRSA"});
+		sig2.init('-----BEGIN PUBLIC KEY-----\n'+pubKey+'\n-----END PUBLIC KEY-----');
+		sig2.updateString(source);
+		var isValid = sig2.verify(sign);
+       	return isValid;
+    }
+
+
+    //获取随机16位key
+    function randomKeys(rdmSize) {
+        var seed = "0123456789abcdefghijklmnopqrstuvwxyz&";
+        var len = seed.length;
+        var rst = "";
+        for (var i = 0; i < rdmSize; i++) {
+            rst += seed.charAt(Math.round(Math.random() * 36));
+        }
+        return rst;
+    }
+
+    //AES加密参数
+    function aesEncrypt(rdm, data) {
+        var key = CryptoJS.enc.Utf8.parse(rdm);
+        var iv = CryptoJS.enc.Utf8.parse(rdm);
+        encrypted = CryptoJS.AES.encrypt(data, key, {
+            iv: iv,
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+        });
+        //alert(encrypted);
+        // var decrypt = CryptoJS.AES.decrypt(encrypted, key, {
+        //     iv: iv,
+        //     mode: CryptoJS.mode.CBC,
+        //     padding: CryptoJS.pad.Pkcs7
+        // });
+        // var decryptedStr = decrypt.toString(CryptoJS.enc.Utf8);
+        // alert(decryptedStr);
+
+        return encrypted.toString();
+    }
+
+
+    function aesDecrypt(rdm, data) {
+        var key = CryptoJS.enc.Utf8.parse(rdm);
+        var iv = CryptoJS.enc.Utf8.parse(rdm);
+        var decrypt = CryptoJS.AES.decrypt(data, key, {
+            iv: iv,
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+        });
+        return decrypt.toString(CryptoJS.enc.Utf8);
+    }
+
+
+
+    $(function() {
+        $('#getKeys').click(function() {
+            $.ajax({
+                url: 'http://localhost:8087/config/keys',
+                type: 'POST',
+                data: {},
+                timeout: 5000, //超时时间
+                dataType: 'json', //返回的数据格式：json/xml/html/script/jsonp/text
+
+                success: function(data, textStatus, jqXHR) {
+                    var publicKey = data.publicKey;
+                    $('#publicKey').val(publicKey);
+                    $('#privateKey').val(data.privateKey);
+                    alert('获取公钥成功');
+                },
+                error: function(xhr, textStatus) {
+                    console.log('错误')
+                    console.log(xhr)
+                    console.log(textStatus)
+                },
+                complete: function() {
+                    console.log('结束')
+                }
+            });
+        });
+
+
+        $('#genRdm').click(function() {
+            alert(randomKeys(16));
+        });
+
+        $('#login').click(function() {
+            var aeskey = randomKeys(16);
+            var rsaKey = rsaCrypt(aeskey);
+            var username = aesEncrypt(aeskey, $("#username").val());
+            var password = aesEncrypt(aeskey, $("#password").val());
+            alert(aeskey);
+            $.ajax({
+                url: 'http://localhost:8087/crypt/decrypt',
+                type: 'POST', //GET
+                //async:true,    //或false,是否异步
+                data: {
+                    key: rsaKey,
+                    username: username,
+                    password: password
+                },
+                timeout: 5000, //超时时间
+                dataType: 'json', //返回的数据格式：json/xml/html/script/jsonp/text
+                beforeSend: function(xhr) {
+                    //console.log(xhr)
+                    //console.log('发送前')
+                },
+                success: function(data, textStatus, jqXHR) {
+                    console.log(data);
+                    console.log(textStatus)
+                    console.log(jqXHR);
+                    var status = data.status;
+                    if (status === 1) {
+                        alert('成功,获取到的参数为：' + data.rst + '解密之后为：' + aesDecrypt(aeskey, data.rst));
+                        var s = rsaVerify(aeskey, data.sign);
+                        alert('验证签名：' + s);
+                        status = null;
+                    } else {
+                        var msg = data.msg;
+                        alert(msg);
+                        msg = null;
+                        staus = null;
+                    }
+                },
+                error: function(xhr, textStatus) {
+                    console.log('错误')
+                    console.log(xhr)
+                    console.log(textStatus)
+                },
+                complete: function() {
+                    console.log('结束')
+                }
+            });
+
+        });
+
+        $('#test').click(function() {
+            var aeskey = randomKeys(16);
+            alert(aeskey);
+            var rsaKey = rsaCrypt(aeskey);
+            var username = aesCrypt(aeskey, document.getElementById('username').value);
+            var password = aesCrypt(aeskey, document.getElementById('password'));
+            alert(username, password);
+        });
+
+    });
+    </script>
+</head>
+
+<body>
+    <input type="hidden" name="privateKey" id="privateKey" value="">
+    <input type="button" name="getKey" id="getKeys" value="获取公钥">
+    <input id="publicKey" value="" type="text" size="100">
+    <br>
+    <br>
+    <hr style="height:1px;border:none;border-top:1px dashed #0066CC;">
+    <!-- <input type="button" name="generateRandom" id="genRdm" value="生产随机key"> -->
+    <label>username:</label>
+    <input type="input" id="username" name="username" /> &nbsp;&nbsp;&nbsp;&nbsp;
+    <label>password:</label>
+    <input type="password" id="password" name="password" /> &nbsp;&nbsp;&nbsp;&nbsp;
+    <input type="button" id="login" value="Login" />
+    <input type="button" value="Test" id="test">
+    <input type="button" value="Sign" id="sign" onclick="rsaSign()">
+</body>
+
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+    <script type="text/javascript" src="jquery-3.2.1.js"></script>
+    <script type="text/javascript" src="jsencrypt.min.js"></script>
+    <script type="text/javascript" src="aes.js"></script>
+    <script type="text/javascript" src="jsrsasign-all-min.js"></script>
+    
+    <script type="text/javascript">
+    //rsa加密AES的key
+    function rsaCrypt(data) {
+        var rsa = new JSEncrypt();
+        var pubKey = document.getElementById('publicKey').value;
+        if (pubKey) {
+            rsa.setPublicKey(pubKey);
+            return rsa.encrypt(data);
+        }
+
+    }
+
+
+
+    function rsaVerify(source, sign) {
+         var pubKey = document.getElementById('publicKey').value;   
+        var sig2 = new KJUR.crypto.Signature({"alg": "MD5withRSA"});
+		sig2.init('-----BEGIN PUBLIC KEY-----\n'+pubKey+'\n-----END PUBLIC KEY-----');
+		sig2.updateString(source);
+		var isValid = sig2.verify(sign);
+       	return isValid;
+    }
+
+
+    //获取随机16位key
+    function randomKeys(rdmSize) {
+        var seed = "0123456789abcdefghijklmnopqrstuvwxyz&";
+        var len = seed.length;
+        var rst = "";
+        for (var i = 0; i < rdmSize; i++) {
+            rst += seed.charAt(Math.round(Math.random() * 36));
+        }
+        return rst;
+    }
+
+    //AES加密参数
+    function aesEncrypt(seed, data) {
+        var key = CryptoJS.enc.Utf8.parse(seed);
+        var iv = CryptoJS.enc.Utf8.parse(seed);
+        encrypted = CryptoJS.AES.encrypt(data, key, {
+            iv: iv,
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+        });
+        return encrypted.toString();
+    }
+
+    //AES解密参数
+    function aesDecrypt(seed, data) {
+        var key = CryptoJS.enc.Utf8.parse(seed);
+        var iv = CryptoJS.enc.Utf8.parse(seed);
+        var decrypt = CryptoJS.AES.decrypt(data, key, {
+            iv: iv,
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+        });
+        return decrypt.toString(CryptoJS.enc.Utf8);
+    }
+
+
+
+    $(function() {
+        $('#getKeys').click(function() {
+            $.ajax({
+                url: 'http://localhost:8087/config/keys',
+                type: 'POST',
+                data: {},
+                timeout: 5000, //超时时间
+                dataType: 'json', //返回的数据格式：json/xml/html/script/jsonp/text
+
+                success: function(data, textStatus, jqXHR) {
+                    var publicKey = data.publicKey;
+                    $('#publicKey').val(publicKey);
+                    alert('获取公钥成功');
+                },
+                error: function(xhr, textStatus) {
+                    console.log('错误')
+                    console.log(xhr)
+                    console.log(textStatus)
+                },
+                complete: function() {
+                    console.log('结束')
+                }
+            });
+        });
+
+
+        $('#genRdm').click(function() {
+            alert(randomKeys(16));
+        });
+
+        $('#login').click(function() {
+            var aeskey = randomKeys(16);
+            var rsaKey = rsaCrypt(aeskey);
+            var username = aesEncrypt(aeskey, $("#username").val());
+            var password = aesEncrypt(aeskey, $("#password").val());
+            alert(aeskey);
+            $.ajax({
+                url: 'http://localhost:8087/crypt/decrypt',
+                type: 'POST', //GET
+                //async:true,    //或false,是否异步
+                data: {
+                    key: rsaKey,
+                    username: username,
+                    password: password
+                },
+                timeout: 5000, //超时时间
+                dataType: 'json', //返回的数据格式：json/xml/html/script/jsonp/text
+                beforeSend: function(xhr) {
+                    //console.log(xhr)
+                    //console.log('发送前')
+                },
+                success: function(data, textStatus, jqXHR) {
+                    console.log(data);
+                    console.log(textStatus)
+                    console.log(jqXHR);
+                    var status = data.status;
+                    if (status === 1) {
+                        alert('成功,获取到的参数为：' + data.rst + '解密之后为：' + aesDecrypt(aeskey, data.rst));
+                        var s = rsaVerify(aeskey, data.sign);
+                        alert('验证签名：' + s);
+                        status = null;
+                    } else {
+                        var msg = data.msg;
+                        alert(msg);
+                        msg = null;
+                        staus = null;
+                    }
+                },
+                error: function(xhr, textStatus) {
+                    console.log('错误')
+                    console.log(xhr)
+                    console.log(textStatus)
+                },
+                complete: function() {
+                    console.log('结束')
+                }
+            });
+
+        });
+
+    });
+    </script>
+</head>
+
+<body>
+    <input type="hidden" name="privateKey" id="privateKey" value="">
+    <input type="button" name="getKey" id="getKeys" value="获取公钥">
+    <input id="publicKey" value="" type="text" size="100">
+    <br>
+    <br>
+    <hr style="height:1px;border:none;border-top:1px dashed #0066CC;">
+    <!-- <input type="button" name="generateRandom" id="genRdm" value="生产随机key"> -->
+    <label>username:</label>
+    <input type="input" id="username" name="username" /> &nbsp;&nbsp;&nbsp;&nbsp;
+    <label>password:</label>
+    <input type="password" id="password" name="password" /> &nbsp;&nbsp;&nbsp;&nbsp;
+    <input type="button" id="login" value="Login" />
+   <!--  <input type="button" value="Sign" id="sign" onclick="rsaSign()"> -->
+</body>
+
+</html>
